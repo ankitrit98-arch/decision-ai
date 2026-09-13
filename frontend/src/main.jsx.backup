@@ -1,0 +1,107 @@
+import React, {useMemo, useState} from "react";
+import {createRoot} from "react-dom/client";
+import {Brain, ArrowRight, Sparkles, RotateCcw, AlertTriangle, SlidersHorizontal} from "lucide-react";
+import {ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, Radar} from "recharts";
+import "./styles.css";
+
+const API = "http://localhost:8000";
+
+function App(){
+  const [screen,setScreen]=useState("home");
+  const [decision,setDecision]=useState("");
+  const [a,setA]=useState("");
+  const [b,setB]=useState("");
+  const [priorities,setPriorities]=useState(["Money","Career","Time"]);
+  const [context,setContext]=useState("");
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [vars,setVars]=useState({money:50,career:50,time:50,risk:50});
+  const [error,setError]=useState("");
+
+  const analyze=async()=>{
+    if(!decision || !a || !b){setError("Decision and both options are required."); return;}
+    setLoading(true); setError("");
+    try{
+      const r=await fetch(`${API}/analyze`,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({decision,options:[a,b],priorities,context})});
+      if(!r.ok) throw new Error("Backend error");
+      const d=await r.json(); setData(d); setScreen("analysis");
+    }catch(e){setError("Backend not reachable. Start FastAPI on port 8000.");}
+    finally{setLoading(false);}
+  };
+
+  const scores=useMemo(()=>{
+    if(!data) return [];
+    const weights={Money:vars.money,Career:vars.career,Time:vars.time,Risk:vars.risk,Learning:50};
+    return data.options.map((o)=>{
+      const vals=Object.entries(o.scores);
+      let total=0, wsum=0;
+
+      vals.forEach(([f,v])=>{
+        let w=weights[f] ?? 50;
+
+        // Risk tolerance: higher tolerance gives more credit to higher-risk choices.
+        if(f==="Risk"){
+          w=vars.risk;
+          const riskLevel=(10-v);
+          v=vars.risk >= 50 ? v + riskLevel*0.25 : v - riskLevel*0.25;
+          v=Math.max(0,Math.min(10,v));
+        }
+
+        total += v*w;
+        wsum += w;
+      });
+
+      const score=wsum ? total/wsum : 0;
+      return {
+        name:o.name,
+        score:Math.max(0,Math.min(10,+score.toFixed(2)))
+      };
+    });
+  },[data,vars]);
+
+  const winner=scores.length ? scores.reduce((x,y)=>y.score>x.score?y:x) : null;
+  const radar=data ? data.options.map(o=>{
+    const row={name:o.name};
+    data.priorities?.forEach?.(()=>{});
+    Object.entries(o.scores).forEach(([k,v])=>row[k]=v);
+    return row;
+  }) : [];
+
+  const reset=()=>{setScreen("home");setData(null);setVars({money:50,career:50,time:50,risk:50});};
+
+  if(screen==="home") return <div className="app"><header><div className="brand"><Brain/> Decision<span>.AI</span></div><div className="pill">AI + What-If Engine</div></header>
+    <main className="hero"><div className="eyebrow"><Sparkles size={15}/> THINK IN SCENARIOS</div>
+    <h1>Don’t just make a decision.<br/><em>Simulate it.</em></h1>
+    <p className="lead">Compare difficult choices, expose trade-offs, and see how your decision changes when assumptions change.</p>
+    <section className="formCard">
+      <label>What decision are you trying to make?</label>
+      <textarea value={decision} onChange={e=>setDecision(e.target.value)} placeholder="e.g. Should I take a ₹35,000/month job or keep preparing for placements?"/>
+      <div className="grid2"><div><label>Option A</label><input value={a} onChange={e=>setA(e.target.value)} placeholder="Take the job"/></div>
+      <div><label>Option B</label><input value={b} onChange={e=>setB(e.target.value)} placeholder="Continue preparing"/></div></div>
+      <label>What matters most?</label><div className="chips">{["Money","Career","Time","Risk","Learning"].map(x=><button className={priorities.includes(x)?"chip active":"chip"} onClick={()=>setPriorities(p=>p.includes(x)?p.filter(y=>y!==x):[...p,x])}>{x}</button>)}</div>
+      <label>Extra context <small>(optional)</small></label><textarea className="small" value={context} onChange={e=>setContext(e.target.value)} placeholder="Budget, timeline, constraints, goals..."/>
+      {error&&<div className="error">{error}</div>}
+      <button className="primary" onClick={analyze} disabled={loading}>{loading?"Analyzing...":"Simulate Decision"} <ArrowRight size={18}/></button>
+    </section></main></div>;
+
+  return <div className="app"><header><div className="brand"><Brain/> Decision<span>.AI</span></div><button className="ghost" onClick={reset}><RotateCcw size={16}/> New decision</button></header>
+    <main className="dashboard">
+      <div className="dashTitle"><div><div className="eyebrow"><Sparkles size={15}/> SIMULATION RESULT</div><h2>{decision}</h2></div><div className="winner">Current leader <strong>{winner?.name}</strong></div></div>
+      <section className="topGrid">
+        {data.options.map((o,i)=><div className="optionCard" key={o.name}><div className="optionHead"><span>OPTION {String.fromCharCode(65+i)}</span><span className="score">{scores[i]?.score}/10</span></div><h3>{o.name}</h3><div className="scorebar"><i style={{width:`${scores[i]?.score*10}%`}}/></div>
+        <div className="proscons"><div><b>+ Advantages</b>{o.advantages.map(x=><p>✓ {x}</p>)}</div><div><b>− Trade-offs</b>{o.disadvantages.map(x=><p>• {x}</p>)}</div></div></div>)}
+      </section>
+      <section className="panel">
+        <div className="panelHead"><div><SlidersHorizontal/><div><h3>What-If Engine</h3><p>Change one assumption and watch the decision move.</p></div></div><span className="live">LIVE</span></div>
+        <div className="sliders">{[["money","Financial importance"],["career","Career importance"],["time","Time importance"],["risk","Risk tolerance"]].map(([k,l])=><div className="slider"><label>{l}<b>{vars[k]}%</b></label><input type="range" min="0" max="100" value={vars[k]} onChange={e=>setVars({...vars,[k]:+e.target.value})}/><div className="rangeLabels"><span>Low</span><span>High</span></div></div>)}</div>
+        <div className="chart"><ResponsiveContainer width="100%" height={260}><BarChart data={scores}><XAxis dataKey="name"/><YAxis domain={[0,10]}/><Tooltip/><Bar dataKey="score" radius={[8,8,0,0]}/></BarChart></ResponsiveContainer></div>
+      </section>
+      <section className="insightGrid">
+        <div className="panel insight"><div className="icon"><Sparkles/></div><h3>AI Insight</h3><p>{data.summary}</p><p><b>Strongest factor:</b> {data.strongest_factor}</p></div>
+        <div className="panel insight"><div className="icon warn"><AlertTriangle/></div><h3>Biggest uncertainty</h3><p>{data.biggest_uncertainty}</p><h4>Information that could change your decision</h4>{data.missing_information.map(x=><p className="bullet">→ {x}</p>)}</div>
+      </section>
+      <footer>Scores are estimates based on your assumptions — not predictions or professional advice.</footer>
+    </main></div>
+}
+createRoot(document.getElementById("root")).render(<App/>);
