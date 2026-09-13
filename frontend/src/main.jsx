@@ -25,7 +25,7 @@ import {
 
 import "./styles.css";
 
-const API = "http://localhost:8000";
+const API = "https://decision-chatbox-backend.onrender.com";
 
 function App(){
 
