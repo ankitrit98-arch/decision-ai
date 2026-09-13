@@ -1,8 +1,8 @@
-# Decision.AI — What-If Decision Simulator
+# Decision.Chatbox — What-If Decision Simulator
 
-Decision.AI is an interactive decision simulator that helps users compare two choices, understand the factors behind a recommendation, and explore how changing priorities can change the outcome.
+Decision.Chatbox is an interactive decision simulator that helps users compare two choices, understand the factors behind a recommendation, and explore how changing priorities can change the outcome.
 
-Instead of giving a simple yes/no answer, Decision.AI lets users experiment with different assumptions and see how the decision responds.
+Instead of giving a simple yes/no answer, Decision.Chatbox lets users experiment with different assumptions and see how the decision responds.
 
 ## 🚀 Features
 
